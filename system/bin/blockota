@@ -1,0 +1,38 @@
+#!/system/bin/sh
+MODDIR="/data/adb/modules/block_samsung_ota"
+. "$MODDIR/common.sh"
+case "$1" in
+  status|"") status_report;;
+  block|enforce)
+    rm -f "$DISABLE_FILE"
+    if block_all; then
+      echo "Samsung OTA block applied."
+    else
+      echo "Samsung OTA block was not applied. See $LOG"
+      exit 1
+    fi
+    ;;
+  restore|enable) touch "$DISABLE_FILE"; restore_all; echo "Restored and paused. Run blockota resume to block again.";;
+  pause|disable) touch "$DISABLE_FILE"; remove_samsung_update_rule || true; echo "Paused. Packages already disabled stay disabled until: su -c blockota restore";;
+  resume)
+    rm -f "$DISABLE_FILE"
+    if block_all; then
+      echo "Resumed."
+    else
+      echo "Resume did not apply the block. See $LOG"
+      exit 1
+    fi
+    ;;
+  smart-block-on) touch "$SMART_BLOCK_FILE"; scan_smart >/dev/null; block_smart_targets; echo "Smart block applied. Review the log before rebooting.";;
+  smart-block-off) rm -f "$SMART_BLOCK_FILE"; echo "Smart block OFF.";;
+  dryrun-on) touch "$DRYRUN_FILE"; echo "Dry-run ON.";;
+  dryrun-off) rm -f "$DRYRUN_FILE"; echo "Dry-run OFF.";;
+  scan) scan_ota_packages;;
+  scan-smart) scan_smart;;
+  resolve) activity="$(resolve_system_update_activity)"; [ -n "$activity" ] && echo "$activity" || echo "No activity resolved for android.settings.SYSTEM_UPDATE_SETTINGS";;
+  health) health_check; echo "Health check done. See $LOG";;
+  json) write_json_report; cat "$REPORT_JSON";;
+  report) write_html_report;;
+  log) tail -n 120 "$LOG" 2>/dev/null;;
+  *) echo "Usage: blockota {status|block|enforce|restore|pause|resume|smart-block-on|smart-block-off|dryrun-on|dryrun-off|scan|scan-smart|resolve|health|json|report|log}";;
+esac

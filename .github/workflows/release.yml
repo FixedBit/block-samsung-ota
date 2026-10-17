@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and validate tag
+        id: release_vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$GITHUB_REF_NAME"
+          if [[ ! "$VERSION" =~ ^v([0-9]+)\.([0-9])$ ]]; then
+            echo "Release tag must look like v1.0"
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          VERSION_CODE="$((10#$MAJOR * 10 + 10#$MINOR))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Validate source metadata
+        shell: bash
+        env:
+          VERSION: ${{ steps.release_vars.outputs.version }}
+          VERSION_CODE: ${{ steps.release_vars.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          SOURCE_VERSION="$(sed -n 's/^version=//p' module.prop | head -n 1)"
+          SOURCE_CODE="$(sed -n 's/^versionCode=//p' module.prop | head -n 1)"
+          [ "$SOURCE_VERSION" = "$VERSION" ] || { echo "module.prop version must equal tag"; exit 1; }
+          [ "$SOURCE_CODE" = "$VERSION_CODE" ] || { echo "module.prop versionCode must equal tag number"; exit 1; }
+          python3 - "$VERSION" "$VERSION_CODE" <<'PY'
+          import json, sys
+          version, code = sys.argv[1], int(sys.argv[2])
+          data = json.load(open("update.json"))
+          if data.get("version") != version:
+              raise SystemExit("update.json version must equal tag")
+          if data.get("versionCode") != code:
+              raise SystemExit("update.json versionCode must equal tag number")
+          if not str(data.get("zipUrl", "")).endswith("/Block-Samsung-OTA.zip"):
+              raise SystemExit("update.json zipUrl must end with Block-Samsung-OTA.zip")
+          PY
+
+      - name: Validate module scripts and Samsung rule set
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in *.sh system/bin/blockota; do
+            sh -n "$file"
+          done
+          if grep -En 'iptables|ip6tables|pm[[:space:]]+clear|pm[[:space:]]+uninstall|force-stop|kill-background-processes|rm[[:space:]]+-rf|find .* -delete' common.sh service.sh post-fs-data.sh system/bin/blockota; then
+            echo "Unsafe OTA operation found"
+            exit 1
+          fi
+          if ! grep -Fq 'pm disable --user 0 "$c"' common.sh; then
+            echo "Fallback components must use component-level disable for user 0"
+            exit 1
+          fi
+          if ! grep -Fq 'pm disable-user --user 0 "$p"' common.sh; then
+            echo "Packages must use user-0 disable"
+            exit 1
+          fi
+          grep -Fq 'OTA_METADATA_FILE="/data/ota_package/metadata.pb"' common.sh
+          grep -Fq 'OTA_PAYLOAD_METADATA_FILE="/data/ota_package/payload_metadata.bin"' common.sh
+          grep -Fq 'FOTA_UPDATE_ZIP="/data/fota/update.zip"' common.sh
+          grep -Fq '"$OTA_METADATA_FILE"|"$OTA_PAYLOAD_METADATA_FILE"' common.sh
+          python3 - <<'PY'
+          import re
+          import xml.etree.ElementTree as ET
+          text = open("common.sh").read()
+          body = text.split("samsung_ota_packages(){", 1)[1].split("\n}", 1)[0]
+          for required in ("com.wssyncmldm", "com.sec.android.soagent"):
+              if required not in body:
+                  raise SystemExit(f"missing required package: {required}")
+          for banned in (
+              "com.samsung.android.lool",
+              "com.samsung.android.kgclient",
+              "com.android.settings",
+              "com.google.android.gms",
+              "com.android.systemui",
+          ):
+              if banned in body:
+                  raise SystemExit(f"protected package is in the disable list: {banned}")
+          doc = ET.parse("ifw/block_samsung_ota.xml")
+          xml = open("ifw/block_samsung_ota.xml").read()
+          if "Block Samsung OTA: module-owned Samsung software update rule" not in xml:
+              raise SystemExit("IFW rule is missing its ownership marker")
+          for banned in ("kgclient", "com.samsung.android.lool", "update_engine", "com.google.android.gms"):
+              if banned in xml:
+                  raise SystemExit(f"IFW rule contains a forbidden target: {banned}")
+          actions = [n.get("name") for n in doc.iter("action")]
+          if "android.settings.SYSTEM_UPDATE_SETTINGS" not in actions:
+              raise SystemExit("IFW rule must block the software update settings action")
+          components = [n.get("name") for n in doc.iter("component-filter")]
+          needed = (
+              "com.android.settings/.Settings$SoftwareUpdateSettingLaunchActivity",
+              "com.wssyncmldm/com.idm.fotaagent.enabler.ui.downloadconfirm.DownloadConfirmActivity",
+          )
+          for name in needed:
+              if name not in components:
+                  raise SystemExit(f"IFW rule is missing {name}")
+          for tag in ("activity", "broadcast", "service"):
+              nodes = list(doc.iter(tag))
+              if not nodes:
+                  raise SystemExit(f"IFW rule is missing a {tag} block")
+              if any(n.get("block") != "true" for n in nodes):
+                  raise SystemExit(f"every {tag} rule must block")
+          PY
+
+      - name: Build module ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -r -X Block-Samsung-OTA.zip . \
+            -x '.git/*' '.github/*' '.DS_Store' '__MACOSX/*' '*/.DS_Store' '*.zip'
+          unzip -t Block-Samsung-OTA.zip
+          if unzip -Z1 Block-Samsung-OTA.zip | grep -Eq '^(\.git|\.github)/'; then
+            echo "Build archive contains repository metadata"
+            exit 1
+          fi
+          unzip -p Block-Samsung-OTA.zip module.prop >/dev/null
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Block Samsung OTA ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: Block-Samsung-OTA.zip
+          make_latest: true

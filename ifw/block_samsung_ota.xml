@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rules>
+  <!-- Block Samsung OTA: module-owned Samsung software update rule. -->
+  <activity block="true" log="false">
+    <intent-filter>
+      <action name="android.settings.SYSTEM_UPDATE_SETTINGS" />
+      <action name="android.settings.SYSTEM_UPDATE_COMPLETE" />
+      <category name="android.intent.category.DEFAULT" />
+    </intent-filter>
+    <component-filter name="com.android.settings/.Settings$SoftwareUpdateSettingLaunchActivity" />
+    <component-filter name="com.android.settings/.Settings$SoftwareUpdateSettingsActivity" />
+    <component-filter name="com.android.settings/.Settings$SoftwareUpdateDashboardActivity" />
+    <component-filter name="com.android.settings/com.samsung.android.settings.softwareupdate.SoftwareUpdateLaunchActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.userinit.UserInitEntryActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.dialog.IDMUIActivityForDialog" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.reschedulepostpone.ReschedulePostponeActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.downloadconfirm.DownloadConfirmActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.downloadprogress.DownloadProgressActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.installconfirm.InstallConfirmActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.noupdatable.NoUpdatableVersionActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.lastupdate.LastUpdateActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.checkingforupdate.CheckingForUpdateActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.maindescription.MainDescriptionActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.uic.IDMUICActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.admin.main.AdminMainActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.admin.feature.AdminFeatureAndActionActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.admin.profile.AdminProfileActivity" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.common.feature.FeatureInjectionActivity" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.push.campaign.ui.CampaignMessageActivity" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.ui.CampaignActivity" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.abupdate.abenabler.ui.downloadandinstallprogress.DownloadAndInstallProgressActivity" />
+  </activity>
+  <broadcast block="true" log="false">
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.receiver.GenericBroadcastReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.receiver.SecureBroadcastReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.receiver.LaunchReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.receiver.SecretCodeReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.push.campaign.notification.CampaignNotificationReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.push.message.spp.SppReceiver" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.ui.notification.manager.NotificationReceiver" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.enabler.fumo.postpone.PostponeAlarmReceiver" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.policy.afw.duration.PolicyManager$PolicyExpirationAlarmReceiver" />
+  </broadcast>
+  <service block="true" log="false">
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.services.PollingIntentService" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.heartbeat.intentservice.PeriodicHeartbeatIntentService" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.heartbeat.intentservice.OneShotHeartbeatIntentService" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.push.message.fcm.FcmReceiveService" />
+    <component-filter name="com.wssyncmldm/com.samsung.android.fotaagent.device.push.message.spp.SppIntentService" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.scheduler.jobschedule.NetworkResumeJobService" />
+    <component-filter name="com.wssyncmldm/com.idm.fotaagent.InitExecutor$InitService" />
+  </service>
+</rules>

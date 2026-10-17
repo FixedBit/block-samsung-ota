@@ -1,0 +1,7 @@
+id=block_samsung_ota
+name=Block Samsung OTA
+version=v1.0
+versionCode=10
+author=manhgdev, FixedBit
+description=Blocks Samsung software updates for user 0. Disables the FOTA packages and denies the Software update screen. Device Care, Knox Guard, Settings, and Play services stay enabled.
+updateJson=https://raw.githubusercontent.com/FixedBit/block-samsung-ota/main/update.json
