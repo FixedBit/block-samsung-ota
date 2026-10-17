@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1
+
+- Adds a KernelSU WebUI with a status page and a package page, following the same module WebUI pattern as Zygisk Next.
+- Status shows the firewall rule and whether each built-in Samsung update package is disabled.
+- Packages lists installed update-like apps that are not in the built-in list. Block adds one to the extra list. Not an updater hides it from the list.
+- Device Care, Knox Guard, Settings, and Play services stay protected and cannot be blocked from the page.
+
 ## v1.0
 
 Samsung adaptation of manhgdev Block OTA Update v7.3.

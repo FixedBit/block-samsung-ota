@@ -33,6 +33,10 @@ case "$1" in
   health) health_check; echo "Health check done. See $LOG";;
   json) write_json_report; cat "$REPORT_JSON";;
   report) write_html_report;;
+  ui) ui_report;;
+  blacklist-add) blacklist_add_pkg "$2";;
+  blacklist-remove) blacklist_remove_pkg "$2";;
+  ignore-add) ignore_add_pkg "$2";;
   log) tail -n 120 "$LOG" 2>/dev/null;;
-  *) echo "Usage: blockota {status|block|enforce|restore|pause|resume|smart-block-on|smart-block-off|dryrun-on|dryrun-off|scan|scan-smart|resolve|health|json|report|log}";;
+  *) echo "Usage: blockota {status|block|enforce|restore|pause|resume|smart-block-on|smart-block-off|dryrun-on|dryrun-off|scan|scan-smart|resolve|health|json|report|ui|blacklist-add|blacklist-remove|ignore-add|log}";;
 esac

@@ -60,6 +60,16 @@ su -c blockota health
 
 `com.wssyncmldm` and `com.sec.android.soagent` should say `disabled` when those packages exist on the phone. The firewall line should say `installed`.
 
+## WebUI
+
+KernelSU shows an Open button on this module. That page works like Zygisk Next's WebUI: it is a `webroot` page, and it reads live status by running `blockota`.
+
+- **Status** shows whether blocking is active, whether the firewall rule is installed, and the state of every built-in Samsung update package.
+- **Packages** lists installed packages whose names look like an updater but are not already in the built-in list. **Block** disables that package now and on later boots. **Not an updater** hides it from the list. Device Care, Knox Guard, Settings, and Play services cannot be added.
+- **Settings** turns blocking on or off. Off restores the packages this module disabled.
+
+Magisk does not open module WebUI pages itself. Use [KsuWebUI Standalone](https://github.com/5ec1cff/KsuWebUIStandalone/releases), the same app Zygisk Next documents for Magisk.
+
 ## Commands
 
 ~~~sh

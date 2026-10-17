@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Block Samsung OTA</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e1116;
+      --card: #171c24;
+      --line: #2a3340;
+      --text: #f2f5f8;
+      --muted: #9aa4b2;
+      --good: #3dd68c;
+      --bad: #ff6b6b;
+      --warn: #ffd166;
+      --accent: #8ab4ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.4 system-ui, sans-serif;
+      padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 4px; }
+    h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
+    .sub { color: var(--muted); margin: 0 0 16px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs button, button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: #242b36;
+      color: var(--text);
+      font: inherit;
+    }
+    .tabs button.active { background: var(--accent); color: #08111f; font-weight: 700; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      margin: 0 0 12px;
+    }
+    .banner { border-radius: 16px; padding: 14px; margin: 0 0 12px; font-weight: 650; }
+    .blocking { background: #123524; color: var(--good); }
+    .paused, .wrong-device { background: #3a2e12; color: var(--warn); }
+    .incomplete, .error { background: #3a1717; color: var(--bad); }
+    .row, .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+    .row:first-of-type, .meta:first-of-type { border-top: 0; }
+    .name { word-break: break-all; }
+    .state { color: var(--muted); white-space: nowrap; }
+    .state.disabled { color: var(--good); }
+    .state.enabled { color: var(--bad); }
+    .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .actions button, .stack button { border-radius: 12px; }
+    .primary { background: var(--accent); color: #08111f; font-weight: 700; }
+    .danger { background: #6e2a2a; }
+    input {
+      width: 100%;
+      margin: 8px 0;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #0e1116;
+      color: var(--text);
+      font: inherit;
+    }
+    .switch {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+    .stack button { width: 100%; border-radius: 12px; }
+    pre {
+      white-space: pre-wrap;
+      background: #0b0e13;
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--muted);
+      max-height: 240px;
+      overflow: auto;
+    }
+    .hidden { display: none; }
+    .empty { color: var(--muted); margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>Block Samsung OTA</h1>
+  <p class="sub" id="version">Checking this phone…</p>
+  <div class="tabs">
+    <button type="button" id="tab-status" class="active">Status</button>
+    <button type="button" id="tab-packages">Packages</button>
+    <button type="button" id="tab-settings">Settings</button>
+  </div>
+  <div id="error" class="banner error hidden"></div>
+  <section id="view-status"></section>
+  <section id="view-packages" class="hidden"></section>
+  <section id="view-settings" class="hidden"></section>
+  <script src="app.js"></script>
+</body>
+</html>

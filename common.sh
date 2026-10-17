@@ -17,6 +17,8 @@ DRYRUN_FILE="$TOGGLE_DIR/dryrun"
 SMART_BLOCK_FILE="$TOGGLE_DIR/smart_block"
 USER_WHITELIST="$TOGGLE_DIR/whitelist.txt"
 USER_BLACKLIST="$TOGGLE_DIR/blacklist.txt"
+IGNORED_FILE="$TOGGLE_DIR/ignored.txt"
+MISS_RE='ota|fota|soagent|wssync|fotaclient|systemupdate|efota|softwareupdate|(^|\.)sdm(\.|$)'
 IFW_DIR="/data/system/ifw"
 IFW_RULE="$IFW_DIR/block_samsung_ota.xml"
 IFW_SOURCE="$MODDIR/ifw/block_samsung_ota.xml"
@@ -413,6 +415,198 @@ note_resolved_system_update_activity(){
 user_blacklist_targets(){
   [ -f "$USER_BLACKLIST" ] || return 0
   grep -v '^[[:space:]]*#' "$USER_BLACKLIST" | sed '/^[[:space:]]*$/d'
+}
+
+valid_package_name(){
+  printf '%s' "$1" | grep -qxE '[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+'
+}
+
+list_file_entries(){
+  [ -f "$1" ] || return 0
+  grep -v '^[[:space:]]*#' "$1" | sed '/^[[:space:]]*$/d'
+}
+
+list_contains(){
+  list_file_entries "$1" | grep -qx "$2"
+}
+
+list_add(){
+  valid_package_name "$2" || return 1
+  list_contains "$1" "$2" && return 0
+  echo "$2" >> "$1"
+}
+
+list_remove(){
+  [ -f "$1" ] || return 0
+  pending="$STATE_DIR/list.$$"
+  grep -Fvx "$2" "$1" > "$pending" 2>/dev/null || true
+  mv "$pending" "$1"
+}
+
+is_builtin_ota_pkg(){
+  samsung_ota_packages | grep -qx "$1"
+}
+
+drop_applied_record(){
+  entry="$1|$2"
+  [ -f "$APPLIED_LIST" ] || return 0
+  pending="$STATE_DIR/applied.drop.$$"
+  grep -Fvx "$entry" "$APPLIED_LIST" > "$pending" 2>/dev/null || true
+  if [ -s "$pending" ]; then
+    mv "$pending" "$APPLIED_LIST"
+  else
+    rm -f "$pending" "$APPLIED_LIST"
+  fi
+}
+
+release_recorded_package(){
+  p="$1"
+  entry="package|$p"
+  grep -Fqx "$entry" "$APPLIED_LIST" 2>/dev/null || return 0
+  if pm enable --user 0 "$p" >/dev/null 2>&1; then
+    drop_applied_record package "$p"
+    logi "Released extra package user=0: $p"
+  else
+    logi "WARNING: Could not release package: $p"
+    return 1
+  fi
+}
+
+matching_update_packages(){
+  pm list packages 2>/dev/null | cut -d: -f2 | grep -iE "$MISS_RE" | sort
+}
+
+json_pkg(){
+  printf '{"name":"%s","state":"%s"}' "$(json_escape "$1")" "$(json_escape "$2")"
+}
+
+emit_state_array(){
+  first=1
+  printf '['
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ "$first" = 1 ] || printf ','
+    first=0
+    printf '%s' "$(json_pkg "$p" "$(pkg_state "$p")")"
+  done
+  printf ']'
+}
+
+blacklist_add_pkg(){
+  p="$1"
+  valid_package_name "$p" || { echo "invalid package name"; return 1; }
+  if is_builtin_ota_pkg "$p"; then
+    echo "already in the built-in list"
+    return 0
+  fi
+  if is_protected_pkg "$p"; then
+    echo "protected package, left enabled"
+    return 1
+  fi
+  list_remove "$IGNORED_FILE" "$p"
+  list_add "$USER_BLACKLIST" "$p" || return 1
+  if [ -f "$DISABLE_FILE" ]; then
+    echo "saved; turn blocking back on to disable it"
+    return 0
+  fi
+  disable_package_safely "$p"
+  state="$(pkg_state "$p")"
+  if [ "$state" = "disabled" ]; then
+    echo "blocked $p"
+    return 0
+  fi
+  if [ "$state" = "absent" ]; then
+    echo "saved; package is not installed"
+    return 0
+  fi
+  echo "saved, but the package is still enabled"
+  return 1
+}
+
+blacklist_remove_pkg(){
+  p="$1"
+  valid_package_name "$p" || { echo "invalid package name"; return 1; }
+  list_remove "$USER_BLACKLIST" "$p"
+  release_recorded_package "$p" || return 1
+  echo "unblocked $p"
+}
+
+ignore_add_pkg(){
+  p="$1"
+  valid_package_name "$p" || { echo "invalid package name"; return 1; }
+  list_remove "$USER_BLACKLIST" "$p"
+  release_recorded_package "$p" || return 1
+  list_add "$IGNORED_FILE" "$p" || return 1
+  echo "ignored $p"
+}
+
+ui_report(){
+  detect_device
+  version="$(module_value version)"
+  version_code="$(module_value versionCode)"
+  case "$version_code" in
+    ''|*[!0-9]*) version_code=0 ;;
+  esac
+  paused=false
+  [ -f "$DISABLE_FILE" ] && paused=true
+  dryrun=false
+  [ -f "$DRYRUN_FILE" ] && dryrun=true
+  ifw="$(ifw_rule_state)"
+  activity="$(resolve_system_update_activity)"
+  summary="blocking"
+  if [ "$VENDOR" != "samsung" ]; then
+    summary="wrong-device"
+  elif [ "$paused" = true ]; then
+    summary="paused"
+  elif [ "$ifw" != "installed" ]; then
+    summary="incomplete"
+  else
+    for p in $(samsung_ota_packages); do
+      [ "$(pkg_state "$p")" = "enabled" ] && summary="incomplete"
+    done
+  fi
+  printf '{'
+  printf '"version":"%s",' "$(json_escape "$version")"
+  printf '"versionCode":%s,' "$version_code"
+  printf '"paused":%s,' "$paused"
+  printf '"dryrun":%s,' "$dryrun"
+  printf '"summary":"%s",' "$summary"
+  printf '"vendor":"%s",' "$(json_escape "$VENDOR")"
+  printf '"brand":"%s",' "$(json_escape "$BRAND")"
+  printf '"model":"%s",' "$(json_escape "$MODEL")"
+  printf '"device":"%s",' "$(json_escape "$DEVICE")"
+  printf '"android":"%s",' "$(json_escape "$RELEASE")"
+  printf '"sdk":"%s",' "$(json_escape "$SDK")"
+  printf '"oneui":"%s",' "$(json_escape "$ONEUI")"
+  printf '"ifw":"%s",' "$(json_escape "$ifw")"
+  printf '"resolvedActivity":"%s",' "$(json_escape "$activity")"
+  printf '"packages":'
+  samsung_ota_packages | emit_state_array
+  printf ',"missed":'
+  matching_update_packages | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    is_builtin_ota_pkg "$p" && continue
+    is_protected_pkg "$p" && continue
+    list_contains "$USER_BLACKLIST" "$p" && continue
+    list_contains "$IGNORED_FILE" "$p" && continue
+    printf '%s\n' "$p"
+  done | emit_state_array
+  printf ',"protectedMatches":'
+  matching_update_packages | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    is_protected_pkg "$p" || continue
+    printf '%s\n' "$p"
+  done | emit_state_array
+  printf ',"blockedExtra":'
+  user_blacklist_targets | emit_state_array
+  printf ',"ignored":['
+  first=1
+  list_file_entries "$IGNORED_FILE" | while IFS= read -r p; do
+    [ "$first" = 1 ] || printf ','
+    first=0
+    printf '"%s"' "$(json_escape "$p")"
+  done
+  printf ']}\n'
 }
 
 block_samsung_packages(){
